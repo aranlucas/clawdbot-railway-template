@@ -1,5 +1,5 @@
 # Build openclaw from source to avoid npm packaging gaps (some dist files are not shipped).
-FROM node:22-bookworm AS openclaw-build
+FROM platformatic/node-caged:25 AS openclaw-build
 
 # Dependencies needed for openclaw build
 RUN apt-get update \
@@ -7,6 +7,7 @@ RUN apt-get update \
     git \
     ca-certificates \
     curl \
+    unzip \
     python3 \
     make \
     g++ \
@@ -15,8 +16,6 @@ RUN apt-get update \
 # Install Bun (openclaw build uses it)
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"
-
-RUN corepack enable
 
 WORKDIR /openclaw
 
@@ -33,6 +32,9 @@ RUN set -eux; \
     sed -i -E 's/"openclaw"[[:space:]]*:[[:space:]]*"workspace:[^"]+"/"openclaw": "*"/g' "$f"; \
   done
 
+# Node 25 no longer bundles corepack, so install pnpm directly.
+RUN npm install -g pnpm@10.23.0
+
 RUN pnpm install --no-frozen-lockfile
 RUN pnpm build
 ENV OPENCLAW_PREFER_PNPM=1
@@ -40,7 +42,7 @@ RUN pnpm ui:install && pnpm ui:build
 
 
 # Runtime image
-FROM node:22-bookworm
+FROM platformatic/node-caged:25
 ENV NODE_ENV=production
 
 RUN apt-get update \
@@ -52,7 +54,8 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # `openclaw update` expects pnpm. Provide it in the runtime image.
-RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
+# Node 25 no longer bundles corepack, so install pnpm directly.
+RUN npm install -g pnpm@10.23.0
 
 # Persist user-installed tools by default by targeting the Railway volume.
 # - npm global installs -> /data/npm
