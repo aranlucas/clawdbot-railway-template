@@ -1,5 +1,4 @@
 # Build openclaw from source to avoid npm packaging gaps.
-# Use a pinned image tag once you confirm the exact version you want.
 FROM platformatic/node-caged:25 AS openclaw-build
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -13,6 +12,7 @@ RUN apt-get update \
     ca-certificates \
     curl \
     git \
+    unzip \
     python3 \
     make \
     g++ \
@@ -34,7 +34,7 @@ RUN set -eux; \
     sed -i -E 's/"openclaw"[[:space:]]*:[[:space:]]*"workspace:[^"]+"/"openclaw": "*"/g' "$f"; \
   done
 
-# Do not rely on corepack here; install pnpm directly to avoid the missing-corepack failure.
+# Avoid corepack; install pnpm directly
 RUN npm install -g pnpm@10.23.0
 
 RUN pnpm install --no-frozen-lockfile
@@ -60,7 +60,7 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Install pnpm directly instead of using corepack.
+# Install pnpm directly instead of using corepack
 RUN npm install -g pnpm@10.23.0
 
 # Wrapper deps
@@ -83,13 +83,10 @@ COPY src ./src
 # Create writable runtime directories up front
 RUN mkdir -p /data/npm /data/npm-cache /data/pnpm /data/pnpm-store
 
-# Optional non-root runtime user
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
   && chown -R appuser:appuser /app /openclaw /data
 USER appuser
 
-# Railway injects PORT at runtime
 EXPOSE 8080
-
 ENTRYPOINT ["tini", "--"]
 CMD ["node", "src/server.js"]
